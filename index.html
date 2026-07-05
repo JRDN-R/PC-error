@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0d">
+<title>claude-fable-5 · OBS Livestream Diagnosis</title>
+<script>document.documentElement.classList.add('js');</script>
+<style>
+:root{
+  --bg:#0a0a0d;
+  --panel:#131317;
+  --panel-2:#101014;
+  --hairline:rgba(255,255,255,.09);
+  --text:#f5f5f7;
+  --text-body:#cfcfd6;
+  --text-dim:#8f8f98;
+  --accent:#8ab4ff;
+  --glow:rgba(150,180,255,.75);
+  color-scheme:dark;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--text-body);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:1.0625rem;
+  line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+  overflow-x:hidden;
+}
+body::before{
+  content:"";
+  position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(62% 42% at 50% -6%, rgba(99,132,255,.14), transparent 62%),
+    radial-gradient(44% 30% at 88% 8%, rgba(168,120,255,.08), transparent 60%),
+    radial-gradient(50% 34% at 8% 98%, rgba(99,132,255,.05), transparent 60%);
+}
+::selection{background:rgba(138,180,255,.28);color:#fff}
+body.locked{overflow:hidden}
+
+/* ---------- Sticky header ---------- */
+.topbar{
+  position:sticky;top:0;z-index:50;
+  background:rgba(10,10,13,.72);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);
+  backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:.5px solid var(--hairline);
+  padding-top:env(safe-area-inset-top);
+}
+.topbar-inner{
+  max-width:44rem;margin:0 auto;
+  padding:12px 20px 10px;
+  display:flex;flex-direction:column;gap:8px;
+}
+.model{
+  font-size:1.0625rem;
+  font-weight:700;
+  letter-spacing:-.01em;
+  color:var(--text);
+}
+.btn-row{display:flex;justify-content:flex-end}
+.btn-prompt{
+  display:inline-flex;align-items:center;gap:7px;
+  font:inherit;font-size:.875rem;font-weight:600;
+  color:var(--text);
+  background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.14);
+  border-radius:999px;
+  padding:7px 15px;
+  cursor:pointer;
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  transition:background .2s ease,transform .12s ease,border-color .2s ease;
+}
+.btn-prompt svg{width:14px;height:14px;opacity:.85}
+.btn-prompt:hover{background:rgba(255,255,255,.13);border-color:rgba(255,255,255,.22)}
+.btn-prompt:active{transform:scale(.96)}
+.btn-prompt:focus-visible,.sheet-close:focus-visible,.tile:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ---------- Content ---------- */
+.content{
+  max-width:44rem;margin:0 auto;
+  padding:28px 20px calc(90px + env(safe-area-inset-bottom));
+}
+h2{
+  color:var(--text);
+  font-size:1.3rem;
+  font-weight:700;
+  letter-spacing:-.02em;
+  margin:2.3em 0 .65em;
+}
+.content section:first-of-type h2{margin-top:.4em}
+p{margin:.85em 0}
+strong{color:#fff;font-weight:650}
+ol,ul{margin:.9em 0 1.1em;padding-left:1.35em}
+li{margin:.55em 0}
+li::marker{color:var(--text-dim);font-weight:600}
+code{
+  font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  font-size:.86em;
+  color:#e6e6ee;
+  background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:6px;
+  padding:.08em .4em;
+  white-space:nowrap;
+}
+.log{
+  font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  font-size:.78rem;
+  line-height:1.6;
+  color:#c2c8da;
+  background:var(--panel-2);
+  border:1px solid var(--hairline);
+  border-radius:14px;
+  padding:14px 16px;
+  margin:1.1em 0;
+  white-space:pre-wrap;
+  word-break:break-word;
+}
+.verdict{
+  margin:1.4em 0;
+  padding:16px 18px;
+  border-radius:16px;
+  background:linear-gradient(180deg,rgba(99,132,255,.10),rgba(99,132,255,.04));
+  border:1px solid rgba(120,150,255,.22);
+}
+.verdict p{margin:0}
+
+/* Sources */
+.sources{list-style:none;padding:0;margin:1em 0 0;display:grid;gap:9px}
+.sources a{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:13px 15px;
+  background:var(--panel);
+  border:1px solid var(--hairline);
+  border-radius:14px;
+  color:var(--text);
+  font-size:.9rem;font-weight:500;
+  text-decoration:none;
+  transition:background .2s ease,transform .12s ease;
+}
+.sources a:hover{background:#191920}
+.sources a:active{transform:scale(.985)}
+.sources .dom{color:var(--text-dim);font-size:.75rem;font-weight:400;white-space:nowrap;flex-shrink:0}
+.sources .dom::after{content:" ↗";opacity:.7}
+
+/* ---------- Blur-glow reveal ---------- */
+.js .rv{visibility:hidden}
+.rv .w{opacity:0;display:inline-block}
+.rv.on .w{animation:wordIn .8s cubic-bezier(.16,.66,.3,1) forwards}
+@keyframes wordIn{
+  0%{opacity:0;filter:blur(14px);transform:translateY(6px)}
+  45%{opacity:.92;filter:blur(3px);text-shadow:0 0 22px var(--glow),0 0 7px rgba(255,255,255,.5)}
+  100%{opacity:1;filter:blur(0);transform:none;text-shadow:0 0 0 rgba(0,0,0,0)}
+}
+.js .rvb{opacity:0;filter:blur(14px);transform:translateY(8px)}
+.rvb.on{animation:blockIn .9s cubic-bezier(.16,.66,.3,1) forwards}
+@keyframes blockIn{
+  0%{opacity:0;filter:blur(14px);transform:translateY(8px)}
+  55%{opacity:.95;filter:blur(2px)}
+  100%{opacity:1;filter:blur(0);transform:none}
+}
+
+/* ---------- Prompt sheet ---------- */
+.overlay{
+  position:fixed;inset:0;z-index:100;
+  display:flex;align-items:center;justify-content:center;
+  padding:12px;
+  background:rgba(0,0,0,.45);
+  -webkit-backdrop-filter:blur(16px) saturate(120%);
+  backdrop-filter:blur(16px) saturate(120%);
+  opacity:0;pointer-events:none;
+  transition:opacity .32s ease;
+}
+.overlay.open{opacity:1;pointer-events:auto}
+.sheet{
+  width:min(680px,100%);
+  height:min(88dvh,880px);
+  display:flex;flex-direction:column;
+  background:#17171a;
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:24px;
+  box-shadow:0 24px 90px rgba(0,0,0,.65);
+  overflow:hidden;
+  transform:translateY(16px) scale(.965);
+  filter:blur(6px);
+  opacity:0;
+  transition:transform .38s cubic-bezier(.2,.75,.25,1),filter .38s ease,opacity .3s ease;
+}
+.overlay.open .sheet{transform:none;filter:blur(0);opacity:1}
+.sheet-head{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:16px 18px 14px;
+  border-bottom:.5px solid var(--hairline);
+  flex-shrink:0;
+}
+.sheet-title{color:var(--text);font-size:1.05rem;font-weight:700;letter-spacing:-.01em}
+.sheet-sub{color:var(--text-dim);font-size:.78rem;margin-top:2px}
+.sheet-close{
+  width:32px;height:32px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:50%;
+  background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.10);
+  color:#d5d5db;cursor:pointer;
+  transition:background .2s ease,transform .12s ease;
+}
+.sheet-close:hover{background:rgba(255,255,255,.14)}
+.sheet-close:active{transform:scale(.92)}
+.sheet-close svg{width:13px;height:13px}
+.sheet-body{
+  flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:18px 18px calc(22px + env(safe-area-inset-bottom));
+}
+.sec-label{
+  color:var(--text-dim);
+  font-size:.72rem;font-weight:600;
+  text-transform:uppercase;letter-spacing:.09em;
+  margin:0 0 10px;
+}
+.sec-label + .prompt-text,.tiles{margin-bottom:22px}
+.tiles{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(150px,1fr));
+  gap:10px;
+}
+.tile{
+  position:relative;
+  display:flex;flex-direction:column;gap:9px;
+  padding:12px;
+  background:#1f1f24;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:14px;
+  color:inherit;text-decoration:none;
+  transition:background .2s ease,transform .12s ease;
+}
+.tile:hover{background:#26262c}
+.tile:active{transform:scale(.965)}
+.tile-icon{
+  width:34px;height:34px;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:9px;
+  background:rgba(255,90,80,.14);
+  border:1px solid rgba(255,90,80,.25);
+  color:#ff7a70;
+  font-size:.6rem;font-weight:800;letter-spacing:.04em;
+}
+.tile-name{
+  font-size:.72rem;line-height:1.4;
+  color:#d6d6db;
+  word-break:break-word;
+}
+.tile-dl{
+  position:absolute;top:10px;right:10px;
+  color:var(--text-dim);opacity:.7;
+}
+.tile-dl svg{width:14px;height:14px}
+.prompt-text{
+  white-space:pre-wrap;
+  font-size:.9rem;line-height:1.62;
+  color:#e4e4ea;
+  background:#101013;
+  border:1px solid var(--hairline);
+  border-radius:16px;
+  padding:16px 17px;
+  word-break:break-word;
+}
+/* staggered entrance of sheet contents */
+.sheet-body>*{opacity:0;transform:translateY(7px);filter:blur(6px);transition:opacity .5s ease,transform .5s cubic-bezier(.2,.7,.3,1),filter .5s ease}
+.overlay.open .sheet-body>:nth-child(1){transition-delay:.10s}
+.overlay.open .sheet-body>:nth-child(2){transition-delay:.16s}
+.overlay.open .sheet-body>:nth-child(3){transition-delay:.24s}
+.overlay.open .sheet-body>:nth-child(4){transition-delay:.30s}
+.overlay.open .sheet-body>*{opacity:1;transform:none;filter:blur(0)}
+
+/* Scrollbars */
+.sheet-body::-webkit-scrollbar{width:8px}
+.sheet-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:99px}
+.sheet-body::-webkit-scrollbar-track{background:transparent}
+
+@media (min-width:560px){
+  .topbar-inner{flex-direction:row;align-items:center;justify-content:space-between}
+  .btn-row{justify-content:flex-end}
+}
+@media (prefers-reduced-motion:reduce){
+  .js .rv{visibility:visible}
+  .rv .w{opacity:1!important;animation:none!important}
+  .js .rvb{opacity:1!important;filter:none!important;transform:none!important;animation:none!important}
+  .sheet,.overlay,.sheet-body>*{transition:none!important}
+  html{scroll-behavior:auto}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <h1 class="model rv">claude-fable-5 (Max; 128k tokens)</h1>
+    <div class="btn-row rvb">
+      <button class="btn-prompt" id="openPrompt" aria-haspopup="dialog" aria-controls="promptOverlay">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2.5h7l3 3v8a.5.5 0 0 1-.5.5h-9.5a.5.5 0 0 1-.5-.5v-10.5a.5.5 0 0 1 .5-.5z"/><path d="M10 2.5v3h3"/><path d="M5.5 8.5h5M5.5 11h5"/></svg>
+        See Prompt
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="content">
+
+  <section>
+    <h2 class="rv">Short answer</h2>
+    <p class="rv">The evidence points at the network, not the PC — but in two distinct places at once:</p>
+    <ol>
+      <li class="rv">Your <strong>internet upload congested</strong> during the incident window (that's what the dropped-frames counter measures), and</li>
+      <li class="rv"><strong>LAN jitter disrupted NDI audio</strong>, which triggered OBS's audio-buffering safety mechanism — and that mechanism produces exactly the crackle → dropout → out-of-sync → resync sequence you described.</li>
+    </ol>
+    <p class="rv">The TP-Link isn't necessarily "too slow," but a flat, unmanaged, shared consumer network with remote-desktop traffic and background transfers riding on it is the systemic weak point. A few PC/OBS settings amplified it. Details below.</p>
+  </section>
+
+  <section>
+    <h2 class="rv">What your logs actually show</h2>
+    <p class="rv"><strong>First, a spec correction:</strong> your pasted specs (Ryzen 5 3600, 16 GB) don't match the machine — the diagnostic report shows a <strong>Ryzen 9 5950X</strong> (16C/32T) with <strong>48 GB RAM</strong> on Windows 10 22H2. Good news: horsepower is definitively not the problem (4.6% CPU confirms it).</p>
+    <p class="rv"><strong>The dropped frames were a bounded network event, not a constant.</strong> The stream ran 10:22:28 → 12:30:33. Your stats screenshot at 1:02:38 showed 3,727 dropped (4.4%) — and the final log shows the same 3,727 total:</p>
+    <div class="log rvb">Number of dropped frames due to insufficient bandwidth/connection stalls: 3727 (2.1%)</div>
+    <p class="rv">So every dropped frame occurred in the first ~63 minutes, and <strong>zero</strong> in the remaining ~65 minutes. That's a discrete congestion window from roughly <strong>10:32–11:25</strong> — matching your "started about 10 minutes in." Note the counter's own label: this is <strong>bandwidth/connection stalls</strong> (the RTMP path to YouTube), not encoder or GPU. Two more corroborating details: the RTMP socket send buffer grew from 65,536 bytes at start to 2,097,152 bytes by the end, and when you stopped the stream OBS hit <code>Stream shutdown timeout reached (30 second(s))</code> — it still had unsent data queued.</p>
+    <p class="rv"><strong>The audio behavior matches OBS's NDI audio-buffering mechanism, not a broken audio device.</strong> Your log contains this exact signature (logged at launch; mid-stream repeats get collapsed by OBS's "Last log entry repeated for N more lines"):</p>
+    <div class="log rvb">Max audio buffering reached!
+adding 917 milliseconds of audio buffering, total audio buffering is now 960 milliseconds
+Source Lower Thirds *LYRICS ONLY* audio is lagging (over by 265.06 ms) at max audio buffering. Restarting source audio.</div>
+    <p class="rv">Here's how that maps to what you heard: when NDI audio packets arrive late/irregular (jitter), you get crackling/warbled audio; OBS keeps stretching its buffer until the 960 ms cap, then <strong>restarts the source audio</strong> (your dropout); audio returns ~1 second offset from video (out of sync); another restart (second dropout); once network jitter subsides, buffers normalize (resync). Someone also fought it live — the NDI outputs were stopped/restarted at 11:20:09 and <code>Settings changed (outputs)</code> appears at 11:25:55, right when the drop window ends.</p>
+    <p class="rv"><strong>Contributing factors visible in the diagnostics:</strong></p>
+    <ul>
+      <li class="rv">The <strong>Realtek NIC has every power-saving feature enabled</strong> — Energy-Efficient Ethernet, Green Ethernet, Power Saving Mode, and Gigabit Lite. These are classic causes of micro-dropouts on NDI/streaming machines.</li>
+      <li class="rv"><strong>Background transfer activity:</strong> 60 BITS jobs queued (hit the group-policy cap) that morning — that's Windows Update/Store-class download activity on the streaming PC.</li>
+      <li class="rv"><strong>mDNS noise:</strong> Bonjour logged an EpocCam resolver "active for over two minutes" that "places considerable burden on the network," plus an mDNS hostname conflict (DESKTOP-VJT2BR2 vs -2).</li>
+      <li class="rv"><strong>Everything rides one path:</strong> both 4K cameras (your switcher logs show the NDI feeds at 3840×2160 into a 1080p canvas), three NDI feeds from the iMac, MacBook NDI, OBS's own NDI Main and Preview outputs, Google Remote Desktop's upstream screen share, and the 7 Mbps RTMP feed — all through one gigabit NIC and the TP-Link.</li>
+      <li class="rv"><strong>Minor but real:</strong> rendering lag was 3.5–3.8% during the stream (heavy filter stacks + 4K NDI decode), versus your July 3 safe-mode stream (no NDI plugin) which ran 44 minutes at 0.0% lag — the core pipeline is healthy; the transport-dependent parts are the fragile ones. Also: a dead PreSonus FireStudio device (Status: Error), two WASAPI sources that fail to start every launch, and on 7/3 OBS was run with <code>--multi</code> (two instances) — avoid that on stream days.</li>
+    </ul>
+    <div class="verdict">
+      <p class="rv"><strong>Verdict:</strong> Not a PC problem. Mostly not an OBS-core problem (OBS reacted as designed). Most likely a <strong>transient network congestion/jitter event</strong> — with Chrome Remote Desktop the top suspect for the upload side (it streams your screen upstream the whole time, and today's session coincided with a much-worse-than-normal day), background transfers second, and a flat consumer network with zero QoS/visibility making all of it worse.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="rv">Free fixes before you buy anything</h2>
+    <ul>
+      <li class="rv"><strong>On the Realtek NIC:</strong> disable EEE, Green Ethernet, Power Saving Mode, Gigabit Lite; raise Transmit Buffers (128 → 512+).</li>
+      <li class="rv"><strong>No Google Remote Desktop during services</strong> (or throttle it). If someone must watch remotely, have them watch the YouTube stream.</li>
+      <li class="rv"><strong>Pause Windows Update</strong> / check BITS activity before going live.</li>
+      <li class="rv"><strong>Replace the deprecated obs-ndi plugin:</strong> OBS-NDI was renamed to DistroAV (~June 2024), and OBS-NDI must be uninstalled when moving to DistroAV 6.x. Current DistroAV requires OBS 31.1.1+ and NDI Runtime 6.3+ — so update OBS too, and remove the leftover obs-ndi 4.9 entry and NDI 4 runtime your diagnostics show. NDI's own OBS guide says to remove old OBS-NDI versions specifically to prevent conflicts.</li>
+      <li class="rv"><strong>Set the SRG cameras' NDI output to 1080p</strong> (your canvas is 1080p; 4K NDI just adds decode load, render lag, and jitter sensitivity).</li>
+      <li class="rv"><strong>Turn off NDI Preview Output</strong> in OBS unless something actually consumes it.</li>
+      <li class="rv">In OBS audio settings, consider <strong>fixed (not dynamically increasing) buffering</strong>, and clean out the dead audio devices/sources.</li>
+      <li class="rv">Give cameras and the OBS PC <strong>DHCP reservations/static IPs</strong>; don't change output settings mid-stream.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2 class="rv">Recommended network upgrade</h2>
+    <p class="rv"><strong>Design goals:</strong> segment production from everything else, get QoS + per-client visibility on the WAN, proper multicast/mDNS handling for NDI, and enough ports (you're already at the AC1750's 4-port limit — two more cameras force this anyway).</p>
+    <p class="rv"><strong>Switch (the most important piece):</strong> the <strong>Netgear AV Line M4250</strong> is the de-facto NDI switch — it ships with pre-configured profiles for video applications including NDI, with IGMP Plus so AV-over-IP multicasting works out of the box without flooding the network, and it's the only option listed under Network Products in the NDI Marketplace. The line offers PoE+ (30 W) and Ultra90 PoE++ (90 W) models with auto fan controls for near-silent operation — nice in a sound room. One catch on powering cameras over Ethernet: Sony's official spec sheet lists the SRG-A40's PoE requirement as <strong>PoE++ (IEEE 802.3bt Type 4, Class 8) at ≤71.3 W</strong>, while some reseller listings describe it as PoE Plus Class 4 — so if you want one-cable cameras, buy a PoE++ (802.3bt) model (e.g., M4250-10G2XF-PoE++) to be safe; if you'll keep the cameras' DC adapters, the cheaper M4250-10G2F-PoE+ is a popular NDI pick. The M4250's AV UI even makes it easy to run segmented internet and NDI traffic on the same switch.</p>
+    <p class="rv"><strong>Router/gateway:</strong> replace the TP-Link with a small-business gateway that gives you VLANs, QoS, and per-client traffic graphs (so next time you can see who ate the upload). The <strong>UniFi Cloud Gateway Max</strong> is the sweet spot: ~$199, 2.3 Gbps IDS/IPS throughput, four 2.5 GbE ports, built-in controller, fanless at ~16 W, with application/domain-based QoS, VLAN/subnet traffic segmentation, and internet quality/outage reporting. Ubiquiti's current lineup also includes the cheaper UCG-Ultra and bigger UCG-Fiber/UDM-Pro-class units if you want rack-mount or 10G later. (Budget alternative: TP-Link's Omada ER605/ER7206 + managed switch — workable, but weaker visibility. If your ISP "main gateway" also routes, bridge it or put it in passthrough so you're not double-NATed.)</p>
+    <p class="rv"><strong>Access point:</strong> any UniFi U6/U7 (or Omada EAP) on a separate SSID/VLAN. The old AC1750 can be demoted to guest-Wi-Fi AP duty.</p>
+    <p class="rv"><strong>Topology:</strong> ISP → gateway → M4250. Put cameras, OBS PC, iMac, and the MacBook on one <strong>Production VLAN</strong> (keep all NDI devices in the same VLAN so mDNS discovery just works); everything else — family/guest Wi-Fi, office machines — on other VLANs. Enable Smart Queues/QoS on the WAN with headroom reserved for the RTMP stream, and confirm your ISP upload is comfortably ≥3× your 7.4 Mbps bitrate after other traffic.</p>
+  </section>
+
+  <section>
+    <h2 class="rv">How to confirm the diagnosis</h2>
+    <p class="rv">Next non-critical window, replicate it: stream to an unlisted YouTube event, run a continuous <code>ping -t</code> to a camera and to 1.1.1.1, and have the remote person connect via CRD for 15 minutes, then disconnect. If dropped frames and ping jitter climb with CRD active (or during a Windows-update download) and calm afterward, you've found it. If you ever get the crackle with <strong>zero</strong> dropped frames and flat pings, then shift suspicion to the Behringer WING USB path and the ReaStream VST plugins (which also move audio over the network). Given today's logs, though, I'd bet on the network — and the upgrade + free fixes above address both layers.</p>
+  </section>
+
+  <section>
+    <h2 class="rv">Sources</h2>
+    <ul class="sources">
+      <li class="rvb"><a href="https://obsproject.com/forum/resources/distroav-network-audio-video-in-obs-studio-using-ndi%C2%AE-technology.528/updates" target="_blank" rel="noopener">DistroAV (NDI) resource updates<span class="dom">obsproject.com</span></a></li>
+      <li class="rvb"><a href="https://ndi.video/product-finder/netgear-m4250-series-managed-switch/" target="_blank" rel="noopener">NDI Product Finder · Netgear M4250<span class="dom">ndi.video</span></a></li>
+      <li class="rvb"><a href="https://store.ui.com/us/en/products/ucg-max" target="_blank" rel="noopener">UniFi Cloud Gateway Max<span class="dom">store.ui.com</span></a></li>
+      <li class="rvb"><a href="https://techspecs.ui.com/unifi/cloud-gateways" target="_blank" rel="noopener">UniFi Cloud Gateways tech specs<span class="dom">techspecs.ui.com</span></a></li>
+      <li class="rvb"><a href="https://pro.sony/s3/2023/05/04134857/AE_SRG-A40_A12_v2.0_EN.pdf" target="_blank" rel="noopener">Sony SRG-A40 / A12 spec sheet (PDF)<span class="dom">pro.sony</span></a></li>
+      <li class="rvb"><a href="https://distroav.org/" target="_blank" rel="noopener">DistroAV official site<span class="dom">distroav.org</span></a></li>
+      <li class="rvb"><a href="https://www.shi.com/product/46052867/Sony-SRG-A40-Conference-camera" target="_blank" rel="noopener">Sony SRG-A40 listing<span class="dom">shi.com</span></a></li>
+      <li class="rvb"><a href="https://community.ui.com/questions/Sony-SRG-A40-PTZ-PoE-71-3W/7756c227-263b-4279-b649-828da40b12b7" target="_blank" rel="noopener">SRG-A40 PTZ PoE 71.3 W discussion<span class="dom">community.ui.com</span></a></li>
+    </ul>
+  </section>
+
+</main>
+
+<!-- ---------- Prompt sheet ---------- -->
+<div class="overlay" id="promptOverlay" role="dialog" aria-modal="true" aria-label="Prompt">
+  <div class="sheet">
+    <div class="sheet-head">
+      <div>
+        <div class="sheet-title">Prompt</div>
+        <div class="sheet-sub">Sent 07/05/2026 · attachments included</div>
+      </div>
+      <button class="sheet-close" id="closePrompt" aria-label="Close">
+        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9"/></svg>
+      </button>
+    </div>
+    <div class="sheet-body">
+      <div class="sec-label">Attached files</div>
+      <div class="tiles">
+        <a class="tile" href="https://raw.githubusercontent.com/JRDN-R/PC-error/main/(OBS_Log)%202026-07-03%2018-55-22.pdf" target="_blank" rel="noopener" download>
+          <span class="tile-icon">PDF</span>
+          <span class="tile-name">(OBS_Log) 2026-07-03 18-55-22.pdf</span>
+          <span class="tile-dl"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 2v7M4 6.5L7 9.5l3-3M2.5 11.5h9"/></svg></span>
+        </a>
+        <a class="tile" href="https://raw.githubusercontent.com/JRDN-R/PC-error/main/(OBS_Log)%202026-07-03%2019-04-12.pdf" target="_blank" rel="noopener" download>
+          <span class="tile-icon">PDF</span>
+          <span class="tile-name">(OBS_Log) 2026-07-03 19-04-12.pdf</span>
+          <span class="tile-dl"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 2v7M4 6.5L7 9.5l3-3M2.5 11.5h9"/></svg></span>
+        </a>
+        <a class="tile" href="https://raw.githubusercontent.com/JRDN-R/PC-error/main/(OBS_Log)%202026-07-03%2019-31-22.pdf" target="_blank" rel="noopener" download>
+          <span class="tile-icon">PDF</span>
+          <span class="tile-name">(OBS_Log) 2026-07-03 19-31-22.pdf</span>
+          <span class="tile-dl"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 2v7M4 6.5L7 9.5l3-3M2.5 11.5h9"/></svg></span>
+        </a>
+        <a class="tile" href="https://raw.githubusercontent.com/JRDN-R/PC-error/main/(OBS_Log)%202026-07-05%2009-09-21.pdf" target="_blank" rel="noopener" download>
+          <span class="tile-icon">PDF</span>
+          <span class="tile-name">(OBS_Log) 2026-07-05 09-09-21.pdf</span>
+          <span class="tile-dl"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 2v7M4 6.5L7 9.5l3-3M2.5 11.5h9"/></svg></span>
+        </a>
+        <a class="tile" href="https://raw.githubusercontent.com/JRDN-R/PC-error/main/(OBS_Log)%202026-07-05%2009-09-49.pdf" target="_blank" rel="noopener" download>
+          <span class="tile-icon">PDF</span>
+          <span class="tile-name">(OBS_Log) 2026-07-05 09-09-49.pdf</span>
+          <span class="tile-dl"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 2v7M4 6.5L7 9.5l3-3M2.5 11.5h9"/></svg></span>
+        </a>
+        <a class="tile" href="https://raw.githubusercontent.com/JRDN-R/PC-error/main/OBS_Diagnostics_20260705_170531_CONDENSED.pdf" target="_blank" rel="noopener" download>
+          <span class="tile-icon">PDF</span>
+          <span class="tile-name">OBS_Diagnostics_20260705_170531_CONDENSED.pdf</span>
+          <span class="tile-dl"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 2v7M4 6.5L7 9.5l3-3M2.5 11.5h9"/></svg></span>
+        </a>
+      </div>
+      <div class="sec-label">Message</div>
+<div class="prompt-text">We had a livestream issue today in OBS that we’ve never had before. We stream to YouTube using multiple Sony cameras over the network, including a Sony SRG-A40 and SRG-A12 connected by Ethernet for PTZ control and video, plus NDI / NDI HX between the streaming PC and an iMac.
+The stream started normally with clean, synced audio. About 10 minutes in, the audio began crackling and sounding distorted, almost like it was sped up or playing harmonically. After several minutes, the audio dropped out completely. It later came back, but it was badly out of sync with the video, then dropped out again, came back out of sync again, and eventually seemed to resync.
+Our current network is built around a TP-Link AC1750 residential router. The internet connection comes from the main gateway into the TP-Link router, but the livestream setup is essentially all wired Ethernet. We are not relying on Wi-Fi for the cameras or streaming PC.
+Connected devices include the OBS PC, an iMac for NDI / NDI HX, the Sony A40, and the Sony A12. We also had someone remoting in through Google Remote Desktop during the service, which we’ve done before, but today’s issue was much worse than normal.
+We plan to add two more Sony SRG cameras over Ethernet soon, giving us four cameras total on the network.
+Given the dropped frames, audio behavior, NDI / camera traffic, and the residential TP-Link router, what is the most likely cause of the issue? Could the router or network congestion be the weak point, or does this sound more like an OBS, audio, or PC issue?
+Also, if we should replace the TP-Link setup, what commercial-grade router, gateway, switch, or access point setup would you recommend for this kind of livestream network?
+I’m not trying to steer the answer toward the router or network. I’m just looking for your best judgment based on the symptoms.
+OBS stats during the issue:
+Dropped Frames: 3,727 / 4.4%
+Bitrate: 7,366 kbps
+Stream time: 01:02:38
+CPU: 4.6%
+FPS: 23.98 / 23.98
+Relevant PC specs:
+OS: Windows 10 Pro, version 10.0.18363
+Motherboard: MSI MPG X570 Gaming Edge WiFi, AMD X570 chipset
+BIOS: American Megatrends 1.60, 11/6/2019, UEFI
+CPU: AMD Ryzen 5 3600, 6 cores / 12 threads, 3.6 GHz base
+RAM: 16 GB DDR4, 3200 MHz
+GPU: AMD Radeon RX 5700 XT, 8 GB VRAM
+GPU driver: 26.20.15029.20013
+Display output: 1920x1080 at 59 Hz
+Primary storage: 930 GB NVMe SSD
+Additional storage: two 930 GB FAT32 drives
+Ethernet: Realtek PCIe GbE Family Controller, 1 Gbps
+Wi-Fi: Intel Dual Band Wireless-AC 3168
+Bluetooth: 4.2
+Audio: Builtin
+USB controller: AMD USB 3.10 eXtensible Host Controller
+Virtualization: Hyper-V enabled, firmware virtualization disabled
+Observed system load from prior report: CPU around 31%, RAM around 50%, minimal disk I/O, and network I/O around 86 Mbps during streaming.
+
+
+*I've attached the following .pdf files for context (today is 07/05/2026); 10 files: "(OBS_Log) 2026-07-03 19-04-12.pdf"; "(OBS_Log) 2026-07-05 09-09-21.pdf"; "(OBS_Log) 2026-07-03 18-54-18.pdf"; "(OBS_Log) 2026-07-03 18-55-22.pdf"; "(OBS_Log) 2026-07-03 19-31-22.pdf"; "(OBS_Log) 2026-07-01 19-26-45.pdf"; "(OBS_Log) 2026-07-05 09-09-49.pdf"; "(OBS_Log) 2026-06-24 19-31-00.pdf"; "(OBS_Log) 2026-06-28 17-11-27.pdf"; "OBS_Diagnostics_20260705_170531.pdf"*</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ----- Split text into word spans (preserving inline tags) ----- */
+  function splitWords(el){
+    var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
+    var nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach(function(node){
+      var parts = node.textContent.split(/(\s+)/);
+      if (parts.length <= 1 && parts[0] && !parts[0].trim()) return;
+      var frag = document.createDocumentFragment();
+      parts.forEach(function(part){
+        if (!part) return;
+        if (!part.trim()){
+          frag.appendChild(document.createTextNode(part));
+        } else {
+          var s = document.createElement('span');
+          s.className = 'w';
+          s.textContent = part;
+          frag.appendChild(s);
+        }
+      });
+      node.parentNode.replaceChild(frag, node);
+    });
+    el.style.visibility = 'visible';
+  }
+
+  var wordEls = Array.prototype.slice.call(document.querySelectorAll('.rv'));
+  wordEls.forEach(splitWords);
+
+  var allEls = Array.prototype.slice.call(document.querySelectorAll('.rv, .rvb'));
+
+  /* Cascade offsets for whatever is visible on first paint */
+  var vh = window.innerHeight || 800;
+  var k = 0;
+  allEls.forEach(function(el){
+    var r = el.getBoundingClientRect();
+    if (r.top < vh && r.bottom > 0){
+      el.dataset.base = Math.min(k * 95, 700);
+      k++;
+    } else {
+      el.dataset.base = 0;
+    }
+  });
+
+  function activate(el){
+    var base = parseFloat(el.dataset.base || 0);
+    if (el.classList.contains('rv')){
+      var words = el.querySelectorAll('.w');
+      var n = words.length || 1;
+      var step = Math.min(26, Math.max(9, 700 / n));
+      for (var i = 0; i < n; i++){
+        words[i].style.animationDelay = (base + i * step) + 'ms';
+      }
+    } else {
+      el.style.animationDelay = base + 'ms';
+    }
+    el.classList.add('on');
+  }
+
+  if (reduced || !('IntersectionObserver' in window)){
+    allEls.forEach(function(el){ el.classList.add('on'); el.style.visibility = 'visible'; });
+  } else {
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if (entry.isIntersecting){
+          activate(entry.target);
+          io.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.05, rootMargin: '0px 0px -4% 0px' });
+    allEls.forEach(function(el){ io.observe(el); });
+  }
+
+  /* ----- Prompt sheet ----- */
+  var overlay = document.getElementById('promptOverlay');
+  var openBtn = document.getElementById('openPrompt');
+  var closeBtn = document.getElementById('closePrompt');
+  var sheetBody = overlay.querySelector('.sheet-body');
+
+  function openSheet(){
+    overlay.classList.add('open');
+    document.body.classList.add('locked');
+    sheetBody.scrollTop = 0;
+    closeBtn.focus({ preventScroll: true });
+  }
+  function closeSheet(){
+    overlay.classList.remove('open');
+    document.body.classList.remove('locked');
+    openBtn.focus({ preventScroll: true });
+  }
+
+  openBtn.addEventListener('click', openSheet);
+  closeBtn.addEventListener('click', closeSheet);
+  overlay.addEventListener('click', function(e){
+    if (e.target === overlay) closeSheet();
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' && overlay.classList.contains('open')) closeSheet();
+  });
+})();
+</script>
+</body>
+</html>
