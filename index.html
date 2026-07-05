@@ -314,67 +314,67 @@ code{
   <section>
     <h2 class="rv">Short answer</h2>
     <p class="rv">The evidence points at the network, not the PC — but in two distinct places at once:</p>
-    <ol>
-      <li class="rv">Your <strong>internet upload congested</strong> during the incident window (that's what the dropped-frames counter measures), and</li>
-      <li class="rv"><strong>LAN jitter disrupted NDI audio</strong>, which triggered OBS's audio-buffering safety mechanism — and that mechanism produces exactly the crackle → dropout → out-of-sync → resync sequence you described.</li>
+    <ol class="rvb">
+      <li>Your <strong>internet upload congested</strong> during the incident window (that's what the dropped-frames counter measures), and</li>
+      <li><strong>LAN jitter disrupted NDI audio</strong>, which triggered OBS's audio-buffering safety mechanism — and that mechanism produces exactly the crackle → dropout → out-of-sync → resync sequence you described.</li>
     </ol>
-    <p class="rv">The TP-Link isn't necessarily "too slow," but a flat, unmanaged, shared consumer network with remote-desktop traffic and background transfers riding on it is the systemic weak point. A few PC/OBS settings amplified it. Details below.</p>
+    <p class="rvb">The TP-Link isn't necessarily "too slow," but a flat, unmanaged, shared consumer network with remote-desktop traffic and background transfers riding on it is the systemic weak point. A few PC/OBS settings amplified it. Details below.</p>
   </section>
 
   <section>
-    <h2 class="rv">What your logs actually show</h2>
-    <p class="rv"><strong>First, a spec correction:</strong> your pasted specs (Ryzen 5 3600, 16 GB) don't match the machine — the diagnostic report shows a <strong>Ryzen 9 5950X</strong> (16C/32T) with <strong>48 GB RAM</strong> on Windows 10 22H2. Good news: horsepower is definitively not the problem (4.6% CPU confirms it).</p>
-    <p class="rv"><strong>The dropped frames were a bounded network event, not a constant.</strong> The stream ran 10:22:28 → 12:30:33. Your stats screenshot at 1:02:38 showed 3,727 dropped (4.4%) — and the final log shows the same 3,727 total:</p>
+    <h2 class="rvb">What your logs actually show</h2>
+    <p class="rvb"><strong>First, a spec correction:</strong> your pasted specs (Ryzen 5 3600, 16 GB) don't match the machine — the diagnostic report shows a <strong>Ryzen 9 5950X</strong> (16C/32T) with <strong>48 GB RAM</strong> on Windows 10 22H2. Good news: horsepower is definitively not the problem (4.6% CPU confirms it).</p>
+    <p class="rvb"><strong>The dropped frames were a bounded network event, not a constant.</strong> The stream ran 10:22:28 → 12:30:33. Your stats screenshot at 1:02:38 showed 3,727 dropped (4.4%) — and the final log shows the same 3,727 total:</p>
     <div class="log rvb">Number of dropped frames due to insufficient bandwidth/connection stalls: 3727 (2.1%)</div>
-    <p class="rv">So every dropped frame occurred in the first ~63 minutes, and <strong>zero</strong> in the remaining ~65 minutes. That's a discrete congestion window from roughly <strong>10:32–11:25</strong> — matching your "started about 10 minutes in." Note the counter's own label: this is <strong>bandwidth/connection stalls</strong> (the RTMP path to YouTube), not encoder or GPU. Two more corroborating details: the RTMP socket send buffer grew from 65,536 bytes at start to 2,097,152 bytes by the end, and when you stopped the stream OBS hit <code>Stream shutdown timeout reached (30 second(s))</code> — it still had unsent data queued.</p>
-    <p class="rv"><strong>The audio behavior matches OBS's NDI audio-buffering mechanism, not a broken audio device.</strong> Your log contains this exact signature (logged at launch; mid-stream repeats get collapsed by OBS's "Last log entry repeated for N more lines"):</p>
+    <p class="rvb">So every dropped frame occurred in the first ~63 minutes, and <strong>zero</strong> in the remaining ~65 minutes. That's a discrete congestion window from roughly <strong>10:32–11:25</strong> — matching your "started about 10 minutes in." Note the counter's own label: this is <strong>bandwidth/connection stalls</strong> (the RTMP path to YouTube), not encoder or GPU. Two more corroborating details: the RTMP socket send buffer grew from 65,536 bytes at start to 2,097,152 bytes by the end, and when you stopped the stream OBS hit <code>Stream shutdown timeout reached (30 second(s))</code> — it still had unsent data queued.</p>
+    <p class="rvb"><strong>The audio behavior matches OBS's NDI audio-buffering mechanism, not a broken audio device.</strong> Your log contains this exact signature (logged at launch; mid-stream repeats get collapsed by OBS's "Last log entry repeated for N more lines"):</p>
     <div class="log rvb">Max audio buffering reached!
 adding 917 milliseconds of audio buffering, total audio buffering is now 960 milliseconds
 Source Lower Thirds *LYRICS ONLY* audio is lagging (over by 265.06 ms) at max audio buffering. Restarting source audio.</div>
-    <p class="rv">Here's how that maps to what you heard: when NDI audio packets arrive late/irregular (jitter), you get crackling/warbled audio; OBS keeps stretching its buffer until the 960 ms cap, then <strong>restarts the source audio</strong> (your dropout); audio returns ~1 second offset from video (out of sync); another restart (second dropout); once network jitter subsides, buffers normalize (resync). Someone also fought it live — the NDI outputs were stopped/restarted at 11:20:09 and <code>Settings changed (outputs)</code> appears at 11:25:55, right when the drop window ends.</p>
-    <p class="rv"><strong>Contributing factors visible in the diagnostics:</strong></p>
-    <ul>
-      <li class="rv">The <strong>Realtek NIC has every power-saving feature enabled</strong> — Energy-Efficient Ethernet, Green Ethernet, Power Saving Mode, and Gigabit Lite. These are classic causes of micro-dropouts on NDI/streaming machines.</li>
-      <li class="rv"><strong>Background transfer activity:</strong> 60 BITS jobs queued (hit the group-policy cap) that morning — that's Windows Update/Store-class download activity on the streaming PC.</li>
-      <li class="rv"><strong>mDNS noise:</strong> Bonjour logged an EpocCam resolver "active for over two minutes" that "places considerable burden on the network," plus an mDNS hostname conflict (DESKTOP-VJT2BR2 vs -2).</li>
-      <li class="rv"><strong>Everything rides one path:</strong> both 4K cameras (your switcher logs show the NDI feeds at 3840×2160 into a 1080p canvas), three NDI feeds from the iMac, MacBook NDI, OBS's own NDI Main and Preview outputs, Google Remote Desktop's upstream screen share, and the 7 Mbps RTMP feed — all through one gigabit NIC and the TP-Link.</li>
-      <li class="rv"><strong>Minor but real:</strong> rendering lag was 3.5–3.8% during the stream (heavy filter stacks + 4K NDI decode), versus your July 3 safe-mode stream (no NDI plugin) which ran 44 minutes at 0.0% lag — the core pipeline is healthy; the transport-dependent parts are the fragile ones. Also: a dead PreSonus FireStudio device (Status: Error), two WASAPI sources that fail to start every launch, and on 7/3 OBS was run with <code>--multi</code> (two instances) — avoid that on stream days.</li>
+    <p class="rvb">Here's how that maps to what you heard: when NDI audio packets arrive late/irregular (jitter), you get crackling/warbled audio; OBS keeps stretching its buffer until the 960 ms cap, then <strong>restarts the source audio</strong> (your dropout); audio returns ~1 second offset from video (out of sync); another restart (second dropout); once network jitter subsides, buffers normalize (resync). Someone also fought it live — the NDI outputs were stopped/restarted at 11:20:09 and <code>Settings changed (outputs)</code> appears at 11:25:55, right when the drop window ends.</p>
+    <p class="rvb"><strong>Contributing factors visible in the diagnostics:</strong></p>
+    <ul class="rvb">
+      <li>The <strong>Realtek NIC has every power-saving feature enabled</strong> — Energy-Efficient Ethernet, Green Ethernet, Power Saving Mode, and Gigabit Lite. These are classic causes of micro-dropouts on NDI/streaming machines.</li>
+      <li><strong>Background transfer activity:</strong> 60 BITS jobs queued (hit the group-policy cap) that morning — that's Windows Update/Store-class download activity on the streaming PC.</li>
+      <li><strong>mDNS noise:</strong> Bonjour logged an EpocCam resolver "active for over two minutes" that "places considerable burden on the network," plus an mDNS hostname conflict (DESKTOP-VJT2BR2 vs -2).</li>
+      <li><strong>Everything rides one path:</strong> both 4K cameras (your switcher logs show the NDI feeds at 3840×2160 into a 1080p canvas), three NDI feeds from the iMac, MacBook NDI, OBS's own NDI Main and Preview outputs, Google Remote Desktop's upstream screen share, and the 7 Mbps RTMP feed — all through one gigabit NIC and the TP-Link.</li>
+      <li><strong>Minor but real:</strong> rendering lag was 3.5–3.8% during the stream (heavy filter stacks + 4K NDI decode), versus your July 3 safe-mode stream (no NDI plugin) which ran 44 minutes at 0.0% lag — the core pipeline is healthy; the transport-dependent parts are the fragile ones. Also: a dead PreSonus FireStudio device (Status: Error), two WASAPI sources that fail to start every launch, and on 7/3 OBS was run with <code>--multi</code> (two instances) — avoid that on stream days.</li>
     </ul>
-    <div class="verdict">
-      <p class="rv"><strong>Verdict:</strong> Not a PC problem. Mostly not an OBS-core problem (OBS reacted as designed). Most likely a <strong>transient network congestion/jitter event</strong> — with Chrome Remote Desktop the top suspect for the upload side (it streams your screen upstream the whole time, and today's session coincided with a much-worse-than-normal day), background transfers second, and a flat consumer network with zero QoS/visibility making all of it worse.</p>
+    <div class="verdict rvb">
+      <p><strong>Verdict:</strong> Not a PC problem. Mostly not an OBS-core problem (OBS reacted as designed). Most likely a <strong>transient network congestion/jitter event</strong> — with Chrome Remote Desktop the top suspect for the upload side (it streams your screen upstream the whole time, and today's session coincided with a much-worse-than-normal day), background transfers second, and a flat consumer network with zero QoS/visibility making all of it worse.</p>
     </div>
   </section>
 
   <section>
-    <h2 class="rv">Free fixes before you buy anything</h2>
-    <ul>
-      <li class="rv"><strong>On the Realtek NIC:</strong> disable EEE, Green Ethernet, Power Saving Mode, Gigabit Lite; raise Transmit Buffers (128 → 512+).</li>
-      <li class="rv"><strong>No Google Remote Desktop during services</strong> (or throttle it). If someone must watch remotely, have them watch the YouTube stream.</li>
-      <li class="rv"><strong>Pause Windows Update</strong> / check BITS activity before going live.</li>
-      <li class="rv"><strong>Replace the deprecated obs-ndi plugin:</strong> OBS-NDI was renamed to DistroAV (~June 2024), and OBS-NDI must be uninstalled when moving to DistroAV 6.x. Current DistroAV requires OBS 31.1.1+ and NDI Runtime 6.3+ — so update OBS too, and remove the leftover obs-ndi 4.9 entry and NDI 4 runtime your diagnostics show. NDI's own OBS guide says to remove old OBS-NDI versions specifically to prevent conflicts.</li>
-      <li class="rv"><strong>Set the SRG cameras' NDI output to 1080p</strong> (your canvas is 1080p; 4K NDI just adds decode load, render lag, and jitter sensitivity).</li>
-      <li class="rv"><strong>Turn off NDI Preview Output</strong> in OBS unless something actually consumes it.</li>
-      <li class="rv">In OBS audio settings, consider <strong>fixed (not dynamically increasing) buffering</strong>, and clean out the dead audio devices/sources.</li>
-      <li class="rv">Give cameras and the OBS PC <strong>DHCP reservations/static IPs</strong>; don't change output settings mid-stream.</li>
+    <h2 class="rvb">Free fixes before you buy anything</h2>
+    <ul class="rvb">
+      <li><strong>On the Realtek NIC:</strong> disable EEE, Green Ethernet, Power Saving Mode, Gigabit Lite; raise Transmit Buffers (128 → 512+).</li>
+      <li><strong>No Google Remote Desktop during services</strong> (or throttle it). If someone must watch remotely, have them watch the YouTube stream.</li>
+      <li><strong>Pause Windows Update</strong> / check BITS activity before going live.</li>
+      <li><strong>Replace the deprecated obs-ndi plugin:</strong> OBS-NDI was renamed to DistroAV (~June 2024), and OBS-NDI must be uninstalled when moving to DistroAV 6.x. Current DistroAV requires OBS 31.1.1+ and NDI Runtime 6.3+ — so update OBS too, and remove the leftover obs-ndi 4.9 entry and NDI 4 runtime your diagnostics show. NDI's own OBS guide says to remove old OBS-NDI versions specifically to prevent conflicts.</li>
+      <li><strong>Set the SRG cameras' NDI output to 1080p</strong> (your canvas is 1080p; 4K NDI just adds decode load, render lag, and jitter sensitivity).</li>
+      <li><strong>Turn off NDI Preview Output</strong> in OBS unless something actually consumes it.</li>
+      <li>In OBS audio settings, consider <strong>fixed (not dynamically increasing) buffering</strong>, and clean out the dead audio devices/sources.</li>
+      <li>Give cameras and the OBS PC <strong>DHCP reservations/static IPs</strong>; don't change output settings mid-stream.</li>
     </ul>
   </section>
 
   <section>
-    <h2 class="rv">Recommended network upgrade</h2>
-    <p class="rv"><strong>Design goals:</strong> segment production from everything else, get QoS + per-client visibility on the WAN, proper multicast/mDNS handling for NDI, and enough ports (you're already at the AC1750's 4-port limit — two more cameras force this anyway).</p>
-    <p class="rv"><strong>Switch (the most important piece):</strong> the <strong>Netgear AV Line M4250</strong> is the de-facto NDI switch — it ships with pre-configured profiles for video applications including NDI, with IGMP Plus so AV-over-IP multicasting works out of the box without flooding the network, and it's the only option listed under Network Products in the NDI Marketplace. The line offers PoE+ (30 W) and Ultra90 PoE++ (90 W) models with auto fan controls for near-silent operation — nice in a sound room. One catch on powering cameras over Ethernet: Sony's official spec sheet lists the SRG-A40's PoE requirement as <strong>PoE++ (IEEE 802.3bt Type 4, Class 8) at ≤71.3 W</strong>, while some reseller listings describe it as PoE Plus Class 4 — so if you want one-cable cameras, buy a PoE++ (802.3bt) model (e.g., M4250-10G2XF-PoE++) to be safe; if you'll keep the cameras' DC adapters, the cheaper M4250-10G2F-PoE+ is a popular NDI pick. The M4250's AV UI even makes it easy to run segmented internet and NDI traffic on the same switch.</p>
-    <p class="rv"><strong>Router/gateway:</strong> replace the TP-Link with a small-business gateway that gives you VLANs, QoS, and per-client traffic graphs (so next time you can see who ate the upload). The <strong>UniFi Cloud Gateway Max</strong> is the sweet spot: ~$199, 2.3 Gbps IDS/IPS throughput, four 2.5 GbE ports, built-in controller, fanless at ~16 W, with application/domain-based QoS, VLAN/subnet traffic segmentation, and internet quality/outage reporting. Ubiquiti's current lineup also includes the cheaper UCG-Ultra and bigger UCG-Fiber/UDM-Pro-class units if you want rack-mount or 10G later. (Budget alternative: TP-Link's Omada ER605/ER7206 + managed switch — workable, but weaker visibility. If your ISP "main gateway" also routes, bridge it or put it in passthrough so you're not double-NATed.)</p>
-    <p class="rv"><strong>Access point:</strong> any UniFi U6/U7 (or Omada EAP) on a separate SSID/VLAN. The old AC1750 can be demoted to guest-Wi-Fi AP duty.</p>
-    <p class="rv"><strong>Topology:</strong> ISP → gateway → M4250. Put cameras, OBS PC, iMac, and the MacBook on one <strong>Production VLAN</strong> (keep all NDI devices in the same VLAN so mDNS discovery just works); everything else — family/guest Wi-Fi, office machines — on other VLANs. Enable Smart Queues/QoS on the WAN with headroom reserved for the RTMP stream, and confirm your ISP upload is comfortably ≥3× your 7.4 Mbps bitrate after other traffic.</p>
+    <h2 class="rvb">Recommended network upgrade</h2>
+    <p class="rvb"><strong>Design goals:</strong> segment production from everything else, get QoS + per-client visibility on the WAN, proper multicast/mDNS handling for NDI, and enough ports (you're already at the AC1750's 4-port limit — two more cameras force this anyway).</p>
+    <p class="rvb"><strong>Switch (the most important piece):</strong> the <strong>Netgear AV Line M4250</strong> is the de-facto NDI switch — it ships with pre-configured profiles for video applications including NDI, with IGMP Plus so AV-over-IP multicasting works out of the box without flooding the network, and it's the only option listed under Network Products in the NDI Marketplace. The line offers PoE+ (30 W) and Ultra90 PoE++ (90 W) models with auto fan controls for near-silent operation — nice in a sound room. One catch on powering cameras over Ethernet: Sony's official spec sheet lists the SRG-A40's PoE requirement as <strong>PoE++ (IEEE 802.3bt Type 4, Class 8) at ≤71.3 W</strong>, while some reseller listings describe it as PoE Plus Class 4 — so if you want one-cable cameras, buy a PoE++ (802.3bt) model (e.g., M4250-10G2XF-PoE++) to be safe; if you'll keep the cameras' DC adapters, the cheaper M4250-10G2F-PoE+ is a popular NDI pick. The M4250's AV UI even makes it easy to run segmented internet and NDI traffic on the same switch.</p>
+    <p class="rvb"><strong>Router/gateway:</strong> replace the TP-Link with a small-business gateway that gives you VLANs, QoS, and per-client traffic graphs (so next time you can see who ate the upload). The <strong>UniFi Cloud Gateway Max</strong> is the sweet spot: ~$199, 2.3 Gbps IDS/IPS throughput, four 2.5 GbE ports, built-in controller, fanless at ~16 W, with application/domain-based QoS, VLAN/subnet traffic segmentation, and internet quality/outage reporting. Ubiquiti's current lineup also includes the cheaper UCG-Ultra and bigger UCG-Fiber/UDM-Pro-class units if you want rack-mount or 10G later. (Budget alternative: TP-Link's Omada ER605/ER7206 + managed switch — workable, but weaker visibility. If your ISP "main gateway" also routes, bridge it or put it in passthrough so you're not double-NATed.)</p>
+    <p class="rvb"><strong>Access point:</strong> any UniFi U6/U7 (or Omada EAP) on a separate SSID/VLAN. The old AC1750 can be demoted to guest-Wi-Fi AP duty.</p>
+    <p class="rvb"><strong>Topology:</strong> ISP → gateway → M4250. Put cameras, OBS PC, iMac, and the MacBook on one <strong>Production VLAN</strong> (keep all NDI devices in the same VLAN so mDNS discovery just works); everything else — family/guest Wi-Fi, office machines — on other VLANs. Enable Smart Queues/QoS on the WAN with headroom reserved for the RTMP stream, and confirm your ISP upload is comfortably ≥3× your 7.4 Mbps bitrate after other traffic.</p>
   </section>
 
   <section>
-    <h2 class="rv">How to confirm the diagnosis</h2>
-    <p class="rv">Next non-critical window, replicate it: stream to an unlisted YouTube event, run a continuous <code>ping -t</code> to a camera and to 1.1.1.1, and have the remote person connect via CRD for 15 minutes, then disconnect. If dropped frames and ping jitter climb with CRD active (or during a Windows-update download) and calm afterward, you've found it. If you ever get the crackle with <strong>zero</strong> dropped frames and flat pings, then shift suspicion to the Behringer WING USB path and the ReaStream VST plugins (which also move audio over the network). Given today's logs, though, I'd bet on the network — and the upgrade + free fixes above address both layers.</p>
+    <h2 class="rvb">How to confirm the diagnosis</h2>
+    <p class="rvb">Next non-critical window, replicate it: stream to an unlisted YouTube event, run a continuous <code>ping -t</code> to a camera and to 1.1.1.1, and have the remote person connect via CRD for 15 minutes, then disconnect. If dropped frames and ping jitter climb with CRD active (or during a Windows-update download) and calm afterward, you've found it. If you ever get the crackle with <strong>zero</strong> dropped frames and flat pings, then shift suspicion to the Behringer WING USB path and the ReaStream VST plugins (which also move audio over the network). Given today's logs, though, I'd bet on the network — and the upgrade + free fixes above address both layers.</p>
   </section>
 
   <section>
-    <h2 class="rv">Sources</h2>
+    <h2 class="rvb">Sources</h2>
     <ul class="sources">
       <li class="rvb"><a href="https://obsproject.com/forum/resources/distroav-network-audio-video-in-obs-studio-using-ndi%C2%AE-technology.528/updates" target="_blank" rel="noopener">DistroAV (NDI) resource updates<span class="dom">obsproject.com</span></a></li>
       <li class="rvb"><a href="https://ndi.video/product-finder/netgear-m4250-series-managed-switch/" target="_blank" rel="noopener">NDI Product Finder · Netgear M4250<span class="dom">ndi.video</span></a></li>
@@ -527,7 +527,7 @@ Observed system load from prior report: CPU around 31%, RAM around 50%, minimal 
     if (el.classList.contains('rv')){
       var words = el.querySelectorAll('.w');
       var n = words.length || 1;
-      var step = Math.min(26, Math.max(9, 700 / n));
+      var step = Math.min(18, Math.max(6, 420 / n));
       for (var i = 0; i < n; i++){
         words[i].style.animationDelay = (base + i * step) + 'ms';
       }
